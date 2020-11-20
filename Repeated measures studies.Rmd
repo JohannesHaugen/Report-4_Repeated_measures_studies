@@ -1,7 +1,7 @@
 ---
 title: "Arbeidskrav 4: Repeated measures studies"
 author: "Johannes Urdahl Haugen"
-date: "11/17/2020"
+date: "11/20/2020"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -41,8 +41,6 @@ Det var totalt 24 forsøkspersoner med i studien. 11 personer gjennomførte økt
 tabell1 <- view(dataset1) %>%
   mutate(change = post - pre) %>% # Lager en ny variabel change som regner ut endringene fra pre- til post-test.
   group_by(group) %>% # Grupper etter variabelen group
-  
-  filter(!is.na(change)) %>% # Fjern forsøkspersoner uten resultat
   summarise (m = mean(change),
              s = sd(change)) %>% # Regn ut gjennomsnittlig endring og standardavviket
   flextable() %>% #Lag tabell med Flextable
@@ -63,7 +61,7 @@ Tabell 1 viste en høyere gjennomsnittlig endring i RM10 gruppa, men for å se p
 
 Første steg er å sjekke om det er en lineær sammenheng mellom de to gruppene. For å teste dette brukes et enkelt scatter-plot. Figur 1 viser at det er en lineær sammenheng mellom de to gruppene.
 
-```{r scatter plot 1, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+```{r scatter plot 1, echo=FALSE, fig.height=3, fig.width=4, message=FALSE, warning=FALSE}
 scatter1 <- ggscatter(dataset1, x = "pre", y = "post",
   color = "group", add = "reg.line",) + 
   stat_regline_equation(aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = group)) +
@@ -117,7 +115,8 @@ res1plot <- ggline(get_emmeans(res1), x = "group", y = "emmean") + # Lager resul
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) + 
   stat_pvalue_manual(res1, hide.ns = TRUE, tip.length = FALSE) +
   labs(subtitle = get_test_label(avtabell1, detailed = TRUE),
-       caption = get_pwc_label(res1)) 
+       caption = get_pwc_label(res1),
+       title = "Figur 2") 
 
 res1plot
 ```
@@ -134,25 +133,44 @@ Til slutt ble resultatet regnet ut ved at effektene til covariaten (pre-test) bl
 
 ### Resultater
 
-```{r tabell 2, message=FALSE, warning=FALSE, include=FALSE}
-tabell2 %>%
-  select(Effect, F, p, ges) %>%
-  flextable() %>%
-  colformat_num(digits = 3) %>% # Endrer antall desimaler til 2
+```{r tabell 2, echo=FALSE, message=FALSE, warning=FALSE}
+flextable(tabell2) %>%
+  colformat_num(col_keys = c("Effect", 
+                             "F",
+                             "p", 
+                             "ges"),
+                digits = 3) %>% # Endrer antall desimaler
   set_header_labels(Effect = "Effekt",
                     p = "P-verdi"
                     ) %>% # Endrer navn på overskriftene i tabellen.
   
-  add_header_row(values = "Tabell 2: Resultater ANOVA-test", colwidths = 7) %>% #Angir tittel på tabellen
+  add_header_row(values = "Tabell 2: Resultater fra ANCOVA-modellen", colwidths = 7) %>% #Angir tittel på tabellen
   set_table_properties( width = 1, layout = "autofit") %>%
   fontsize(part = "header", size = 12)
 
 
 ```
+<br>
+Tabell 2 viser resultatene fra ANCOVA-modellen. P-verdien var `r tabell2[2, 5]`, altså ikke signifikant (p > 0.05). Figur 2 viser resultatene visuelt.
 
-```{r tabell 2, echo=FALSE, message=FALSE, warning=FALSE}
-
+```{r figur 2, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+res1plot
 ```
+<br>
+<br>
+
+### Diskusjon
+Resultatene fra den statistiske analysen viste at det ikke er grunnlag for å si at færre repetisjoner er bedre for styrke enn få repetisjoner. P-verdien på `r tabell2[2, 5]` var ikke signifikant i dette tilfellet. Likevel finnes det motstridende forskninge på dette området. 
+
+Schoenfeld et al. (2017) gjennomførte en meta-analyse på dette området. De fant at færre repetisjoner med høyere motstand ga bedre effekt på styrke enn mange repetisjoner med lav motstand. 
+
+Schoenfeld et al. (2015) gjennomførte en studie på godt trente menn. De sammenlignet effekten av høy motstand, få repetisjoner og lav motstand, mange repetisjoner. Konklusjonen ble at færre repetisjoner var best for å øke styrken, men det var ingen tydelig forskjell på muskelvekst.
+
+Dataene i min analyse indikerer det samme, men de var ikke signifikante. Fra tabell 1 ser vi at gruppen med færre repitisjoner hadde større endring enn gruppa med mange repetisjoner. Årsaken til at jeg ikke fikk et signifkant resultat er usikkert, men det kan være på grunn av for lite data. Hadde jeg analysert hele datasettet og ikke kun fokusert på benkpress kunne resultatet kanskje vært annerledes.
+
+
+<br>
+<br>
 
 ## Del 2
 
@@ -169,10 +187,9 @@ dataset2 <- read_csv("./data/strengthTests.csv", na = "NA") %>%
 ```
 
 ### Bakgrunn
-1. Jeg er interessert i alle øvelsene.
-2. Endringer før og etter treningsperioden. (Pre-Post)
-3. 
-4. Hypoteser
+Innenfor styrketrening finnes det ulike teorier om hvor mange sett man burde gjennomføre for å størst effekt. Noen mener mange flere sett lønner seg, andre mener ett sett er nok. I del 2 av denne oppgaven skal jeg forsøke å svare på hvor mange sett man burde ha i en øvelse for å øke styrken mest effektivt. Tallene jeg bruker i analysen er hentet fra pre-test og post-test.
+
+Det var totalt 46 forsøkspersoner med i studien. 17 personer gjennomførte økter med 3 sett, og 17 forsøkspersoner gjennomførte økter med 1 sett. Tabell 1 viser hvordan endringene var fra pre-test til post-test i de to gruppene.
 
 
 ```{r oppsummeringstabell 2, echo=FALSE, message=FALSE, warning=FALSE}
@@ -194,7 +211,13 @@ tabell1.1 <- dataset2 %>%
 tabell1.1
 ```
 
-```{r scatter plot 2, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+
+### Metode
+Tabell 1 viste en høyere gjennomsnittlig endring i 3 sett gruppa, men for å se på om denne forskjellen er signifikant må det gjennomføres en statistisk analyse. Til å gjennomføre analysen har jeg valgt å bruke en ANCOVA-modell. I denne modellen bruker jeg pre-test verdiene som covariate for å justere for eventuelle forskjeller før intervensjonsperioden. Jeg er ute etter forskjellene i de to gruppene etter intervensjonsperioden(post-test).
+
+Første steg er å sjekke om det er en lineær sammenheng mellom de to gruppene. For å teste dette brukes et enkelt scatter-plot. Figur 1 viser at det er en lineær sammenheng mellom de to gruppene.
+
+```{r scatter plot 2, echo=FALSE, fig.height=3, fig.width=4, message=FALSE, warning=FALSE}
 
 scatter2 <- ggscatter(dataset2, x = "pre", y = "post",
   color = "group", add = "reg.line",) + 
@@ -222,7 +245,7 @@ model.metrics2 <- augment(model2) %>% # Brukes for å finne "fitted values" og r
 head(model.metrics2, 3)
 
 
-shapiro2 <- shapiro_test(model.metrics2$.resid) # Bruker en shapiro-test for å sjekke normaliteten til residualene. Testen var ikke signifikant (p=0,05) og betyr at residualene er tilnærmet normale.
+shapiro2 <- shapiro_test(model.metrics2$.resid) # Bruker en shapiro-test for å sjekke normaliteten til residualene. Testen var signifikant (p=0,05) og betyr at residualene IKKE er normale.
 shapiro2
 
 
@@ -232,7 +255,7 @@ levene2
 
 model.metrics2 %>% 
   filter(abs(.std.resid) > 3) %>%
-  as.data.frame() # Sjekker om det er noen ekstreme verdier. Ingen ble funnet.
+  as.data.frame() # Sjekker om det er noen ekstreme verdier. To ble funnet.
 
 
 avtabell2 <- dataset2 %>% anova_test(post ~ pre + group) # Gjennomfører en test for å se på
@@ -252,13 +275,65 @@ res2plot <- ggline(get_emmeans(res2), x = "group", y = "emmean") + # Lager resul
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) + 
   stat_pvalue_manual(res2, hide.ns = TRUE, tip.length = FALSE) +
   labs(subtitle = get_test_label(avtabell2, detailed = TRUE),
-       caption = get_pwc_label(res2)) 
+       caption = get_pwc_label(res2),
+       title = "Figur 2") 
 
 res2plot
 ```
 
+Homogeniteten i mellom de to regresjonene ble testet ved hjelp av en enkel anova-test. Denne ga en p-verdi på `r hom2[3, 5]`. Denne var ikke statistisk signifikant og vil si at det er homogenitet i mellom de to regresjonene.
+
+Normaliteten av residualene ble testet ved hjelp av en shapiro-test. Denne ga en p-verdi på `r shapiro2[1, 3]` (Hvordan skriver jeg kode i teksten for å endre antall desimaler?). Denne p-verdien var statistisk signifikant og det er ikke normalitet mellom residualene.
+
+Homoskedastisiteten ble testet ved hjelp av en levene test. Denne ga en p-verdi på `r levene2[1, 4]` og var ikke signifikant.
+
+Ekstreme verdier er noe vi ønsker å unngå når vi jobber med statistisk analyse fordi disse potensielt kan påvirke resultatene. Ved en enkel test ble det funnet 2 ekstreme verdier i dette datasettet. Hver gruppe hadde en ekstrem verdi. Disse ble med i analysen (mest fordi undertegnede ikke fant en god løsning på å fjerne dem, hehe).
+
+Til slutt ble resultatet regnet ut ved at effektene til covariaten (pre-test) ble fjernet og anova-testen ble gjennomført. Tabell 2 viser resultatene av analysen. 
+
+
+### Resultater
 ```{r tabell 2.1, echo=FALSE, message=FALSE, warning=FALSE}
+flextable(tabell2.1) %>%
+  colformat_num(col_keys = c("Effect", 
+                             "F",
+                             "p", 
+                             "ges"),
+                digits = 3) %>% # Endrer antall desimaler
+  set_header_labels(Effect = "Effekt",
+                    p = "P-verdi"
+                    ) %>% # Endrer navn på overskriftene i tabellen.
+  
+  add_header_row(values = "Tabell 2: Resultater fra ANCOVA-modellen", colwidths = 7) %>% #Angir tittel på tabellen
+  set_table_properties( width = 1, layout = "autofit") %>%
+  fontsize(part = "header", size = 12)
 
 ```
+<br>
+
+Tabell 2 viser resultatene fra ANCOVA-modellen. P-verdien var `r tabell2.1[2, 5]`. Dette er en signifikant verdi (p < 0.05). Figur 2 viser resultatene visuelt.
+
+```{r figur 2.1, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+res2plot
+```
+<br>
+<br>
+
+### Diskusjon
+Resultatene fra den statistiske analysen viste at det er grunnlag for å si at flere sett er bedre for å øke styrke enn kun ett sett . P-verdien på `r tabell2.1[2, 5]` var signifikant. I litteraturen finnes det flere eksempler som støtter disse funnene.
+
+Humburg et al. (2007) gjennomførte en crossover-studie som så på forskjellen ved 1 sett styrketrening og 3 sett styrketrening. Denne studien ble gjort på utrente menn og kvinner. I første treningsperiode trente de i 9 uker med kun 1 sett per øvelse. Etter de første 9 ukene hadde de en 9 ukers hvileperiode før de gjennomførte 9 uker med 3 sett per øvelse. Denne studien viste antydning til at flere sett er mer effektivt for å øke styrke.
+
+Schlumberger et al. (2001) gjennomførte en studie på 27 kvinner og ønsket å undersøke forskjellen på 1 sett og 3 sett styrketrening. Det ble gjennomført 2 økter i uken i 6 uker. Studien viste bedre effekt på styrketrening med 3 sett. 
+
+Ut i fra litteraturen kan vi være ganske sikre på at resultatene fra den statistiske analysen stemmer. Det er likevel vanskelig å komme til en tydelig konklusjon da jeg ikke har nok informasjon om gjennomføring av denne studien. Dataene viser en signifikant forskjell mellom 3 sett og 1 sett styrketrening, hvor 3 sett gir best effekt.
 
 
+## Referanser
+Humburg, H., Baars, H., Schröder, J., Reer, R. & Braumann, K. M. (2007). 1-Set vs. 3-set resistance training: a crossover study. J Strength Cond Res, 21(2), 578-582. https://doi.org/10.1519/r-21596.1
+
+Schlumberger, A., Stec, J. & Schmidtbleicher, D. (2001). Single- vs. multiple-set strength training in women. J Strength Cond Res, 15(3), 284-289. 
+
+Schoenfeld, B. J., Grgic, J., Ogborn, D. & Krieger, J. W. (2017). Strength and Hypertrophy Adaptations Between Low- vs. High-Load Resistance Training: A Systematic Review and Meta-analysis. J Strength Cond Res, 31(12), 3508-3523. https://doi.org/10.1519/jsc.0000000000002200
+
+Schoenfeld, B. J., Peterson, M. D., Ogborn, D., Contreras, B. & Sonmez, G. T. (2015). Effects of Low- vs. High-Load Resistance Training on Muscle Strength and Hypertrophy in Well-Trained Men. J Strength Cond Res, 29(10), 2954-2963. https://doi.org/10.1519/jsc.0000000000000958
