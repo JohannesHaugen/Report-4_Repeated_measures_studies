@@ -1,0 +1,264 @@
+---
+title: "Arbeidskrav 4: Repeated measures studies"
+author: "Johannes Urdahl Haugen"
+date: "11/17/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r load libraries, message=FALSE, warning=FALSE, include=FALSE}
+library(readxl)
+library(tidyverse)
+library(flextable)
+library(broom)
+library(ggpubr)
+library(rstatix)
+```
+
+
+## Del 1
+```{r forbered data 1, message=FALSE, warning=FALSE, include=FALSE}
+dataset1 <- read_excel("./data/ten_vs_thirty.xlsx", na = "NA") %>%
+  filter(timepoint != "mid", # Fjerner timepoint "mid" fordi jeg er interessert i pre-post
+         exercise == "benchpress") %>% # Velger ut øvelsen benkpress
+  mutate(timepoint = factor(timepoint, 
+                            levels = c("pre",  "post"))) %>% # Gjør timepoint om til numeriske variabler
+  pivot_wider(names_from = timepoint, 
+              values_from = load) %>% # Lager en egen kolonne med timepointene pre og post
+  filter(!is.na(pre),
+         !is.na(post))
+
+```
+
+### Bakgrunn
+Innenfor styrketrening finnes det mange ulike teorier om hvilken intensitet man burde trene på for å bli sterkest mulig. Noen mener mange repetisjoner med lettere vekter er den riktige måten å trene på, andre mener få repetisjoner med tunge vekter er mest effektivt. I del 1 av denne oppgaven skal jeg forsøke å svare på hvilken intensitet man burde trene på for å øke styrken i benkpress. Tallene jeg bruker i analysen er hentet fra pre-test og post-test.
+
+Det var totalt 24 forsøkspersoner med i studien. 11 personer gjennomførte økter med 30 repetisjoner, 13 forsøkspersoner gjennomførte økter med 10 repetisjoner. Belastningen var slik at forsøkspersonen var utslitt etter henholdsvis 10 og 30 repetisjoner (10RM og 30RM). Det vil si at forsøkspersonene i 10RM gruppa trente med tyngre vekter enn forsøkspersonene i 30RM gruppa. Tabell 1 viser hvordan endringene var fra pre-test til post-test i de to gruppene.
+
+
+```{r oppsummeringstabell 1, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+tabell1 <- view(dataset1) %>%
+  mutate(change = post - pre) %>% # Lager en ny variabel change som regner ut endringene fra pre- til post-test.
+  group_by(group) %>% # Grupper etter variabelen group
+  
+  filter(!is.na(change)) %>% # Fjern forsøkspersoner uten resultat
+  summarise (m = mean(change),
+             s = sd(change)) %>% # Regn ut gjennomsnittlig endring og standardavviket
+  flextable() %>% #Lag tabell med Flextable
+  colformat_num(digits = 2) %>% # Endrer antall desimaler til 2
+  set_header_labels(group = "Gruppe",
+                    m = "Gjennomsnittlig endring (kg)",
+                    s = "Standardavvik") %>% # Endrer navn på overskriftene i tabellen.
+  
+  add_header_row(values = "Tabell 1: Endringer fra pre til post-test", colwidths = 3) %>% #Angir tittel på tabellen
+  set_table_properties( width = 1, layout = "autofit") %>%
+  fontsize(part = "header", size = 12)
+
+tabell1
+```
+
+### Metode
+Tabell 1 viste en høyere gjennomsnittlig endring i RM10 gruppa, men for å se på om denne forskjellen er signifikant må det gjennomføres en statistisk analyse. Til å gjennomføre analysen har jeg valgt å bruke en ANCOVA-modell. I denne modellen bruker jeg pre-test verdiene som covariate for å justere for eventuelle forskjeller før intervensjonsperioden. Jeg er ute etter forskjellene i de to gruppene etter intervensjonsperioden(post-test).
+
+Første steg er å sjekke om det er en lineær sammenheng mellom de to gruppene. For å teste dette brukes et enkelt scatter-plot. Figur 1 viser at det er en lineær sammenheng mellom de to gruppene.
+
+```{r scatter plot 1, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+scatter1 <- ggscatter(dataset1, x = "pre", y = "post",
+  color = "group", add = "reg.line",) + 
+  stat_regline_equation(aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = group)) +
+  labs(x = "Pre-test", y = "Post-test", title = "Figur 1") +# Sjekker om det er et lineært forhold mellom de to gruppene
+  scale_colour_discrete("Gruppe", labels = c("RM10","RM30"))
+
+scatter1
+```
+
+```{r fremgangsmåte 1, message=FALSE, warning=FALSE, include=FALSE}
+hom1 <- dataset1 %>% 
+  anova_test(post ~ group*pre) # Sjekker homogeniteten i gruppa
+hom1 # Printer resultatet. Det er homogenitet i gruppa
+
+
+model1 <- lm(post ~ pre + group, data = dataset1) # Grullaget for ANCOVA-modellen.
+
+
+model.metrics <- augment(model1) %>% # Brukes for å finne "fitted values" og residualene
+  select(-.hat, -.sigma, -.fitted) # Fjerner unødvendige detaljer
+head(model.metrics, 3)
+
+
+shapiro1 <- shapiro_test(model.metrics$.resid) # Bruker en shapiro-test for å sjekke normaliteten til residualene. Testen var ikke signifikant (p=0,05) og betyr at residualene er tilnærmet normale.
+shapiro1
+
+
+levene1 <- model.metrics %>% levene_test(.resid ~ group) # Bruker en levene_test for å sjekke om variansen i residualene er lik i de to gruppene. Testen var ikke signifikant og betyr at variansen er tilnærmet lik.
+levene1
+
+
+model.metrics %>% 
+  filter(abs(.std.resid) > 3) %>%
+  as.data.frame() # Sjekker om det er noen ekstreme verdier. Ingen ble funnet.
+
+
+avtabell1 <- dataset1 %>% anova_test(post ~ pre + group) # Gjennomfører en test for å se på
+tabell2 <- get_anova_table(avtabell1) # Etter å ha justert for pretest-score viste anova-testen at det ikke var en signifikant forskjell mellom gruppene.
+
+
+pwc1 <- dataset1 %>% # Sammenligner gruppene (pairwise comparison) for å se på forskjellen mellom de ved hjelp av en emmeans test og justerer p-verdiene etter bonferroni-metoden.
+  emmeans_test(post ~ group, covariate = pre,
+    p.adjust.method = "bonferroni")
+pwc1
+
+get_emmeans(pwc1) # Viser justerte gjennomnsittsverdier for gruppene.
+
+
+res1 <- pwc1 %>% add_xy_position(x = "group", fun = "mean_se") # Klargjør til å lage plot.
+res1plot <- ggline(get_emmeans(res1), x = "group", y = "emmean") + # Lager resultatplottet
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) + 
+  stat_pvalue_manual(res1, hide.ns = TRUE, tip.length = FALSE) +
+  labs(subtitle = get_test_label(avtabell1, detailed = TRUE),
+       caption = get_pwc_label(res1)) 
+
+res1plot
+```
+
+Homogeniteten i mellom de to regresjonene ble testet ved hjelp av en enkel anova-test. Denne ga en p-verdi på `r hom1[3, 5]`. Denne var ikke statistisk signifikant og vil si at det er homogenitet i mellom de to regresjonene.
+
+Normaliteten av residualene ble testet ved hjelp av en shapiro-test. Denne ga en p-verdi på `r shapiro1[1, 3]`. I og med at denne p-verdien ikke var statistisk signifikant antar vi normalitet mellom residualene.
+
+Homoskedastisiteten ble testet ved hjelp av en levene test. Denne ga en p-verdi på `r levene1[1, 4]` og var ikke signifikant.
+
+Ekstreme verdier er noe vi ønsker å unngå når vi jobber med statistisk analyse fordi disse potensielt kan påvirke resultatene. Ved en enkel test ble det ikke funnet noen ekstreme verdier i dette datasettet.
+
+Til slutt ble resultatet regnet ut ved at effektene til covariaten (pre-test) ble fjernet og anova-testen ble gjennomført. Tabell 2 viser resultatene av analysen. 
+
+### Resultater
+
+```{r tabell 2, message=FALSE, warning=FALSE, include=FALSE}
+tabell2 %>%
+  select(Effect, F, p, ges) %>%
+  flextable() %>%
+  colformat_num(digits = 3) %>% # Endrer antall desimaler til 2
+  set_header_labels(Effect = "Effekt",
+                    p = "P-verdi"
+                    ) %>% # Endrer navn på overskriftene i tabellen.
+  
+  add_header_row(values = "Tabell 2: Resultater ANOVA-test", colwidths = 7) %>% #Angir tittel på tabellen
+  set_table_properties( width = 1, layout = "autofit") %>%
+  fontsize(part = "header", size = 12)
+
+
+```
+
+```{r tabell 2, echo=FALSE, message=FALSE, warning=FALSE}
+
+```
+
+## Del 2
+
+```{r forbered data 2, message=FALSE, warning=FALSE, include=FALSE}
+dataset2 <- read_csv("./data/strengthTests.csv", na = "NA") %>%
+  filter(timepoint != "session1", # Fjerner timepoint "session1" fordi jeg er interessert i pre-post
+         !is.na(load)) %>% # Fjerner na-verdier i load.
+  mutate(timepoint = factor(timepoint, 
+                            levels = c("pre",  "post"))) %>% # Gjør timepoint om til numeriske variabler
+  pivot_wider(names_from = timepoint, 
+              values_from = load) %>% # Lager en egen kolonne med timepointene pre og post
+  filter(!is.na(pre),
+         !is.na(post))
+```
+
+### Bakgrunn
+1. Jeg er interessert i alle øvelsene.
+2. Endringer før og etter treningsperioden. (Pre-Post)
+3. 
+4. Hypoteser
+
+
+```{r oppsummeringstabell 2, echo=FALSE, message=FALSE, warning=FALSE}
+tabell1.1 <- dataset2 %>%
+  mutate(change = post - pre) %>% # Lager en ny variabel change som regner ut endringene fra pre- til post-test.
+  group_by(group) %>% # Grupper etter variabelen group
+  summarise (m = mean(change),
+             s = sd(change)) %>% # Regn ut gjennomsnittlig endring og standardavviket
+  flextable() %>% #Lag tabell med Flextable
+  colformat_num(digits = 2) %>% # Endrer antall desimaler til 2
+  set_header_labels(group = "Gruppe",
+                    m = "Gjennomsnittlig endring",
+                    s = "Standardavvik") %>% # Endrer navn på overskriftene i tabellen.
+  
+  add_header_row(values = "Tabell 1: Endringer fra pre til post-test", colwidths = 3) %>% #Angir tittel på tabellen
+  set_table_properties( width = 1, layout = "autofit") %>%
+  fontsize(part = "header", size = 12)
+
+tabell1.1
+```
+
+```{r scatter plot 2, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+
+scatter2 <- ggscatter(dataset2, x = "pre", y = "post",
+  color = "group", add = "reg.line",) + 
+  stat_regline_equation(aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = group)) +
+  labs(x = "Pre-test", y = "Post-test", title = "Figur 1") +# Sjekker om det er et lineært forhold mellom de to gruppene
+  scale_colour_discrete(name = "Gruppe", labels = c("3 set","1 set"))
+
+scatter2
+
+
+```
+
+
+```{r fremgangsmåte 2, message=FALSE, warning=FALSE, include=FALSE}
+hom2 <- dataset2 %>% 
+  anova_test(post ~ group*pre) # Sjekker homogeniteten i gruppa
+hom2 # Printer resultatet. Det er homogenitet i gruppa
+
+
+model2 <- lm(post ~ pre + group, data = dataset2) # Grunnlaget for ANCOVA-modellen.
+
+
+model.metrics2 <- augment(model2) %>% # Brukes for å finne "fitted values" og residualene
+  select(-.hat, -.sigma, -.fitted) # Fjerner unødvendige detaljer
+head(model.metrics2, 3)
+
+
+shapiro2 <- shapiro_test(model.metrics2$.resid) # Bruker en shapiro-test for å sjekke normaliteten til residualene. Testen var ikke signifikant (p=0,05) og betyr at residualene er tilnærmet normale.
+shapiro2
+
+
+levene2 <- model.metrics2 %>% levene_test(.resid ~ group) # Bruker en levene_test for å sjekke om variansen i residualene er lik i de to gruppene. Testen var ikke signifikant og betyr at variansen er tilnærmet lik.
+levene2
+
+
+model.metrics2 %>% 
+  filter(abs(.std.resid) > 3) %>%
+  as.data.frame() # Sjekker om det er noen ekstreme verdier. Ingen ble funnet.
+
+
+avtabell2 <- dataset2 %>% anova_test(post ~ pre + group) # Gjennomfører en test for å se på
+tabell2.1 <- get_anova_table(avtabell2) # Etter å ha justert for pretest-score viste anova-testen at det ikke var en signifikant forskjell mellom gruppene.
+
+
+pwc2 <- dataset2 %>% # Sammenligner gruppene (pairwise comparison) for å se på forskjellen mellom de ved hjelp av en emmeans test og justerer p-verdiene etter bonferroni-metoden.
+  emmeans_test(post ~ group, covariate = pre,
+    p.adjust.method = "bonferroni")
+pwc2
+
+get_emmeans(pwc2) # Viser justerte gjennomnsittsverdier for gruppene.
+
+
+res2 <- pwc2 %>% add_xy_position(x = "group", fun = "mean_se") # Klargjør til å lage plot.
+res2plot <- ggline(get_emmeans(res2), x = "group", y = "emmean") + # Lager resultatplottet
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) + 
+  stat_pvalue_manual(res2, hide.ns = TRUE, tip.length = FALSE) +
+  labs(subtitle = get_test_label(avtabell2, detailed = TRUE),
+       caption = get_pwc_label(res2)) 
+
+res2plot
+```
+
+```{r tabell 2.1, echo=FALSE, message=FALSE, warning=FALSE}
+
+```
+
+
